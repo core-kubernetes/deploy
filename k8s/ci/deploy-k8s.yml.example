@@ -1,0 +1,58 @@
+# Copy vào .github/workflows/deploy-k8s.yml (mỗi repo BE/FE/Admin)
+# Secrets cần: KUBECONFIG (base64), GHCR có thể dùng GITHUB_TOKEN
+
+name: Deploy K8s
+
+on:
+  push:
+    branches: [production]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-push-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:production
+            ghcr.io/${{ github.repository }}:${{ github.sha }}
+          # FE/Admin: thêm build-args từ repo secrets
+          # build-args: |
+          #   REACT_APP_API_BASE_URL=${{ secrets.REACT_APP_API_BASE_URL }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
+
+      - name: Rollout deployment
+        run: |
+          DEPLOY=api   # đổi thành web hoặc admin tùy repo
+          kubectl set image deployment/${DEPLOY} \
+            ${DEPLOY}=ghcr.io/${{ github.repository }}:${{ github.sha }} \
+            -n findsource
+          kubectl rollout status deployment/${DEPLOY} -n findsource --timeout=300s

@@ -1,0 +1,72 @@
+services:
+   findsource-api:
+      image: findsource-api:develop
+      build:
+         context: ../findsource-be
+         dockerfile: Dockerfile
+      container_name: findsource-api
+      restart: unless-stopped
+      pull_policy: always
+      env_file:
+         - ${ENV_FILE:-.env.develop}
+      environment:
+         DB_HOST: mysql
+         DB_PORT: 3306
+         DB_NAME: ${DB_NAME}
+         DB_USER: ${DB_USERNAME}
+         DB_PASSWORD: ${DB_PASSWORD}
+      ports:
+         - "${API_PORT:-7003}:7003"
+      volumes:
+         - api_uploads:/app/office-storage
+      networks:
+         - findsource
+         - shared_db_network
+
+   web:
+      image: findsource-web:develop
+      build:
+         context: ../findsource-fe
+         dockerfile: Dockerfile
+         args:
+            REACT_APP_API_BASE_URL: ${REACT_APP_API_BASE_URL}
+            REACT_APP_CONTACT_PHONE: ${REACT_APP_CONTACT_PHONE}
+            REACT_APP_ZALO_CHAT_URL: ${REACT_APP_ZALO_CHAT_URL}
+            REACT_APP_MESSENGER_CHAT_URL: ${REACT_APP_MESSENGER_CHAT_URL}
+      container_name: findsource-web
+      restart: unless-stopped
+      pull_policy: always
+      ports:
+         - "${WEB_PORT:-3000}:80"
+      depends_on:
+         - findsource-api
+      networks:
+         - findsource
+
+   admin:
+      image: findsource-admin:develop
+      build:
+         context: ../findsource-admin
+         dockerfile: Dockerfile
+         args:
+            VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+      container_name: findsource-admin
+      restart: unless-stopped
+      pull_policy: always
+      ports:
+         - "${ADMIN_PORT:-5173}:80"
+      depends_on:
+         - findsource-api
+      networks:
+         - findsource
+
+volumes:
+   api_uploads:
+      driver: local
+
+networks:
+   findsource:
+      driver: bridge
+   shared_db_network:
+      external: true
+      name: shared_db_network
