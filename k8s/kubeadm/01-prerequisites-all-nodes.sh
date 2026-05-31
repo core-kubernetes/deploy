@@ -22,9 +22,10 @@ net.ipv4.ip_forward                 = 1
 EOF
 sysctl --system
 
-# containerd cần cho kubeadm
 apt-get update
-apt-get install -y apt-transport-https ca-certificates curl gnupg
+# kubeadm preflight: conntrack, socat, ebtables...
+apt-get install -y apt-transport-https ca-certificates curl gnupg \
+  conntrack socat ebtables ethtool
 
 if command -v ufw >/dev/null 2>&1 && ufw status | grep -q active; then
   ufw allow 22/tcp

@@ -92,7 +92,15 @@ sudo bash 03-init-control-plane.sh <IP_cp-1>
 sudo bash 03-init-control-plane.sh
 ```
 
-Copy **lệnh `kubeadm join ...`** in ra cuối — lưu Notepad.
+**Lưu lệnh `kubeadm join ...`** in ra cuối — dùng trên **worker-1** và **worker-2** để 2 máy đó “xin vào” cluster (chưa join thì chỉ có cp-1, app không chạy được trên worker).
+
+```text
+kubeadm join 172.31.30.134:6443 --token ... --discovery-token-ca-cert-hash sha256:...
+```
+
+- Chạy **trên từng worker** (SSH worker-1, rồi worker-2), với `sudo`.
+- IP `172.31.30.134` = private IP cp-1 (đúng với AWS cùng VPC).
+- Token hết hạn sau ~24h → trên cp-1: `kubeadm token create --print-join-command`
 
 Thiết lập kubectl (user devops, vẫn trên cp-1):
 
@@ -121,19 +129,60 @@ kubectl get nodes
 
 ## Bước 6 — Join worker (worker-1 & worker-2, 10 phút)
 
-Trên **worker-1**, rồi **worker-2**:
+### Token và `sha256:...` lấy ở đâu?
+
+Cả hai do **`kubeadm init` trên cp-1 tạo ra** — bạn **không tự nghĩ** ra.
+
+| Thành phần | Ví dụ | Ý nghĩa |
+|------------|-------|---------|
+| `172.31.30.134:6443` | IP private cp-1 | Địa chỉ API Server (cùng IP đã dùng trong `03-init-control-plane.sh`) |
+| `--token abc.def` | `91drif.rhe27wpia6l1tvqx` | Mật khẩu tạm để worker đăng ký (bootstrap token) |
+| `--discovery-token-ca-cert-hash sha256:...` | `sha256:350fd38d...` | Hash cert cluster — chống join nhầm cluster giả |
+
+**Nguồn lệnh đầy đủ (chọn 1):**
+
+1. **Cuối output `03-init-control-plane.sh`** — 2 dòng `kubeadm join ...` (dùng **dòng cuối**, token mới hơn).
+2. **Bất cứ lúc nào trên cp-1** (token cũ hết hạn sau ~24h):
 
 ```bash
-cd ~/findsource/deploy/k8s/kubeadm
-export JOIN_CMD='kubeadm join <IP_cp-1>:6443 --token ... --discovery-token-ca-cert-hash sha256:...'
-sudo -E bash 04-join-worker.sh
-```
-
-Token hết hạn? Trên cp-1:
-
-```bash
+# Trên cp-1 — in ra 1 dòng copy-paste
 kubeadm token create --print-join-command
 ```
+
+Ví dụ output:
+
+```text
+kubeadm join 172.31.30.134:6443 --token 91drif.rhe27wpia6l1tvqx \
+  --discovery-token-ca-cert-hash sha256:350fd38d37032b089397ee4824cf8d96a304fb208a4a768724118ecc77fb563e
+```
+
+→ Copy **nguyên cả dòng** (gộp 1 dòng cũng được).
+
+---
+
+### Chạy trên worker-1, rồi worker-2
+
+**Cách A — trực tiếp (dễ nhất):**
+
+```bash
+sudo kubeadm join 172.31.30.134:6443 --token <TOKEN> \
+  --discovery-token-ca-cert-hash sha256:<HASH>
+```
+
+Thay `<TOKEN>` và `<HASH>` bằng giá trị từ lệnh trên cp-1.
+
+**Cách B — script:**
+
+```bash
+cd ~/deploy/k8s/kubeadm
+sudo bash 04-join-worker.sh 'kubeadm join 172.31.30.134:6443 --token 91drif.rhe27wpia6l1tvqx --discovery-token-ca-cert-hash sha256:350fd38d37032b089397ee4824cf8d96a304fb208a4a768724118ecc77fb563e'
+```
+
+(Dán **đúng** lệnh của bạn — ví dụ trên chỉ là mẫu.)
+
+**Checkpoint trên worker:** thấy `This node has joined the cluster.`
+
+Lặp lại trên **worker-2** (cùng lệnh join).
 
 Quay lại **cp-1**:
 
