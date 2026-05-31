@@ -143,4 +143,4 @@ kubectl rollout undo deployment/api -n findsource
 1. [`kubeadm/README.md`](./kubeadm/README.md) — cài cluster
 2. Khi 3 node Ready → addons → deploy app
 
-SSL Compose cũ: [`../cert.md`](../cert.md) — trên K8s dùng cert-manager.
+**Lỗi thường gặp:** [errors/README.md](./errors/README.md) (conntrack, join timeout SG, NODE_IP…)

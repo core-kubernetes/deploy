@@ -184,6 +184,8 @@ sudo bash 04-join-worker.sh 'kubeadm join 172.31.30.134:6443 --token 91drif.rhe2
 
 Lặp lại trên **worker-2** (cùng lệnh join).
 
+**Lỗi `context deadline exceeded` khi join (AWS):** worker không tới `cp-1:6443` → xem [errors/03-join-timeout-aws-security-group.md](./errors/03-join-timeout-aws-security-group.md). Test: `nc -zv 172.31.30.134 6443`.
+
 Quay lại **cp-1**:
 
 ```bash
@@ -331,12 +333,16 @@ CI/CD (`deploy-k8s.yml`) làm **sau** khi site chạy được tay.
 
 ## Kẹt ở đâu?
 
-| Triệu chứng          | Xem                               |
-| -------------------- | --------------------------------- |
-| Node NotReady mãi    | Chưa chạy Flannel (Bước 5)        |
-| kubeadm join fail    | Token hết hạn, firewall 6443      |
-| Pod ImagePullBackOff | Chưa push GHCR / chưa ghcr-secret |
-| SSL fail             | DNS chưa trỏ, port 80 chưa mở     |
+Xem **[errors/README.md](./errors/README.md)** — log lỗi thực tế + fix.
+
+| Triệu chứng          | File |
+| -------------------- | ---- |
+| `NODE_IP` / init fail | [01-node-ip-not-set.md](./errors/01-node-ip-not-set.md) |
+| `conntrack not found` | [02-conntrack-not-found.md](./errors/02-conntrack-not-found.md) |
+| join timeout / `nc` 6443 | [03-join-timeout-aws-security-group.md](./errors/03-join-timeout-aws-security-group.md) |
+| Node NotReady mãi    | Chưa Flannel (Bước 5) |
+| Pod ImagePullBackOff | Chưa GHCR / ghcr-secret |
+| SSL fail             | DNS, port 80/443 |
 
 ---
 
