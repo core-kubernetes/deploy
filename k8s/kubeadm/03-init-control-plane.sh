@@ -1,10 +1,27 @@
 #!/usr/bin/env bash
 # Init Control Plane — CHỈ chạy trên cp-1 (server 1)
+#
+# Usage:
+#   sudo bash 03-init-control-plane.sh
+#   sudo bash 03-init-control-plane.sh 203.0.113.10
+#   export NODE_IP=203.0.113.10 && sudo bash 03-init-control-plane.sh
 set -euo pipefail
 
-: "${NODE_IP:?Set NODE_IP — IP mà API Server advertise (thường IP private hoặc public cp-1)}"
+NODE_IP="${NODE_IP:-${1:-}}"
+if [[ -z "${NODE_IP}" ]]; then
+  NODE_IP="$(hostname -I | awk '{print $1}')"
+fi
+if [[ -z "${NODE_IP}" ]]; then
+  echo "Không tự nhận được IP. Chạy:"
+  echo "  sudo bash 03-init-control-plane.sh <IP_cp-1>"
+  echo "IP phải là địa chỉ worker dùng để kubeadm join (thường IP private trong VPC)."
+  exit 1
+fi
 
 POD_CIDR="${POD_CIDR:-10.244.0.0/16}"
+
+echo "NODE_IP=${NODE_IP} (apiserver-advertise-address)"
+echo "POD_CIDR=${POD_CIDR}"
 
 kubeadm init \
   --pod-network-cidr="${POD_CIDR}" \

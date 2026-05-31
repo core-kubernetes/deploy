@@ -85,8 +85,11 @@ Chỉ SSH vào **cp-1**:
 
 ```bash
 cd ~/findsource/deploy/k8s/kubeadm
-export NODE_IP=<IP_cp-1>    # IP mà worker join tới (thường IP private hoặc public)
-sudo -E bash 03-init-control-plane.sh
+# Cách 1: truyền IP (khuyến nghị — IP private trong VPC nếu worker cùng mạng)
+sudo bash 03-init-control-plane.sh <IP_cp-1>
+
+# Cách 2: script tự lấy IP đầu tiên của hostname -I
+sudo bash 03-init-control-plane.sh
 ```
 
 Copy **lệnh `kubeadm join ...`** in ra cuối — lưu Notepad.

@@ -49,8 +49,8 @@ sudo bash kubeadm/02-install-containerd-kubeadm.sh
 ## Bước 2 — Init Control Plane (chỉ cp-1)
 
 ```bash
-export NODE_IP=<IP_cp-1>
-sudo -E bash kubeadm/03-init-control-plane.sh
+# IP private trong VPC (worker join cùng mạng) — hoặc public nếu worker ở ngoài
+sudo bash kubeadm/03-init-control-plane.sh <IP_cp-1>
 ```
 
 Thiết lập kubeconfig (user devops):
