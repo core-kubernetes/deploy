@@ -8,15 +8,15 @@ NAMESPACE="${NAMESPACE:-findsource}"
 
 export KUBECONFIG="${KUBECONFIG:-$HOME/.kube/config}"
 
+ENV_GHCR="${ROOT}/.env.ghcr"
 if ! kubectl get secret ghcr-secret -n "${NAMESPACE}" &>/dev/null; then
-  echo "Missing ghcr-secret in namespace ${NAMESPACE}."
-  echo "Create it first:"
-  echo "  kubectl create secret docker-registry ghcr-secret \\"
-  echo "    --namespace=${NAMESPACE} \\"
-  echo "    --docker-server=ghcr.io \\"
-  echo "    --docker-username=PhamTuanKhoi \\"
-  echo "    --docker-password=YOUR_GITHUB_PAT"
-  exit 1
+  if [[ -f "${ENV_GHCR}" ]]; then
+    bash "${SCRIPT_DIR}/05b-create-ghcr-secret.sh"
+  else
+    echo "Missing ghcr-secret. Run: bash scripts/05b-create-ghcr-secret.sh"
+    echo "(needs .env.ghcr — see GHCR.md)"
+    exit 1
+  fi
 fi
 
 if ! kubectl get secret findsource-api-env -n "${NAMESPACE}" &>/dev/null; then

@@ -336,11 +336,7 @@ nano .env.production
 bash scripts/05-create-secrets.sh
 ```
 
-Sửa image GitHub org trong `overlays/production/kustomization.yaml`:
-
-```yaml
-newName: ghcr.io/YOUR_GITHUB_USER/findsource-api
-```
+Image GHCR: `ghcr.io/phamtuankhoi/...` (đã set trong `overlays/`). Credential: [GHCR.md](./GHCR.md) + file `.env.ghcr`.
 
 Build image lần đầu trên laptop (Bước 11), rồi trên **cp-1**:
 
@@ -360,27 +356,27 @@ curl -I https://be.emiu.site/process   # sau cert Ready (~2 phút)
 
 ## Bước 11 — Image lần đầu (chưa cần CI)
 
-**Cách nhanh nhất** — build trên laptop, push GHCR:
+Chi tiết + credential: **[GHCR.md](./GHCR.md)** (file `.env.ghcr`, user `PhamTuanKhoi`, image `ghcr.io/phamtuankhoi`).
+
+**Mac:**
 
 ```bash
-# Login GHCR (PAT packages:write)
-echo $GITHUB_PAT | docker login ghcr.io -u YOUR_USER --password-stdin
+cd deploy/k8s && set -a && source .env.ghcr && set +a
+echo "$GITHUB_PAT" | docker login ghcr.io -u "$GITHUB_USER" --password-stdin
+export GHCR_USER=phamtuankhoi
 
-# API (từ repo findsource-be)
-docker build -t ghcr.io/YOUR_USER/findsource-api:production .
-docker push ghcr.io/YOUR_USER/findsource-api:production
-
-# FE / Admin tương tự — nhớ build-arg URL emiu.site
+cd findsource-be
+docker build -t ghcr.io/$GHCR_USER/findsource-api:production .
+docker push ghcr.io/$GHCR_USER/findsource-api:production
 ```
 
-Tạo pull secret trên **cp-1**:
+**cp-1** (copy `.env.ghcr` lên server hoặc tạo tay):
 
 ```bash
-kubectl create secret docker-registry ghcr-secret \
-  --docker-server=ghcr.io \
-  --docker-username=YOUR_USER \
-  --docker-password=YOUR_PAT \
-  -n findsource
+cd ~/deploy/k8s
+bash scripts/05b-create-ghcr-secret.sh
+bash scripts/08-deploy-be.sh          # mysql + api trước
+# kubectl apply -k overlays/production   # sau khi push đủ web/admin
 ```
 
 CI/CD (`deploy-k8s.yml`) làm **sau** khi site chạy được tay.
