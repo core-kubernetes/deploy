@@ -7,10 +7,52 @@ namespace: findsource
 resources:
   - ../../base
 
-# Kustomize v5: không reference file ../../base/*.yaml trực tiếp — dùng base/ rồi xóa web/admin
 patches:
-  - path: delete-web-admin.yaml
   - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: web
+    patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: web
+      $patch: delete
+  - target:
+      version: v1
+      kind: Service
+      name: web
+    patch: |
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: web
+      $patch: delete
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: admin
+    patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: admin
+      $patch: delete
+  - target:
+      version: v1
+      kind: Service
+      name: admin
+    patch: |
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: admin
+      $patch: delete
+  - target:
+      group: apps
+      version: v1
       kind: Deployment
       name: api
     patch: |
