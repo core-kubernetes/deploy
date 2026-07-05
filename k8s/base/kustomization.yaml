@@ -4,12 +4,12 @@ kind: Kustomization
 namespace: findsource
 
 resources:
-  - ../namespace.yaml
-  - ../mysql/statefulset.yaml
-  - ../api/deployment.yaml
-  - ../web/deployment.yaml
-  - ../admin/deployment.yaml
-  - ../ingress/ingress.yaml
+  - namespace.yaml
+  - mysql/statefulset.yaml
+  - api/deployment.yaml
+  - web/deployment.yaml
+  - admin/deployment.yaml
+  - ingress/ingress.yaml
 
 commonLabels:
   app.kubernetes.io/part-of: findsource

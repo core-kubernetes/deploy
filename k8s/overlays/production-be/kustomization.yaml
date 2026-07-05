@@ -5,21 +5,11 @@ kind: Kustomization
 namespace: findsource
 
 resources:
-  - ../../base/namespace.yaml
-  - ../../base/mysql/statefulset.yaml
-  - ../../base/api/deployment.yaml
-  - ../../base/ingress/ingress.yaml
+  - ../../base
 
-commonLabels:
-  app.kubernetes.io/part-of: findsource
-  app.kubernetes.io/managed-by: kustomize
-
-images:
-  - name: findsource-api
-    newName: ghcr.io/phamtuankhoi/findsource-api
-    newTag: production
-
+# Kustomize v5: không reference file ../../base/*.yaml trực tiếp — dùng base/ rồi xóa web/admin
 patches:
+  - path: delete-web-admin.yaml
   - target:
       kind: Deployment
       name: api
@@ -27,3 +17,8 @@ patches:
       - op: replace
         path: /spec/replicas
         value: 2
+
+images:
+  - name: findsource-api
+    newName: ghcr.io/phamtuankhoi/findsource-api
+    newTag: production
