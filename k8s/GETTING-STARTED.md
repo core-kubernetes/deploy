@@ -232,17 +232,17 @@ kubectl get nodes -o wide
 
 Tại nhà cung cấp domain, A record → **public IP worker-1** (Ingress nhận traffic ở đây):
 
-| IP | Dùng cho DNS? | Ghi chú |
-|----|---------------|---------|
-| `13.238.15.194` | **Có** | Public IP — user trên internet truy cập được |
-| `172.31.23.25` | **Không** | Private IP trong VPC — chỉ node trong cluster dùng nội bộ |
+| IP              | Dùng cho DNS? | Ghi chú                                                   |
+| --------------- | ------------- | --------------------------------------------------------- |
+| `13.238.15.194` | **Có**        | Public IP — user trên internet truy cập được              |
+| `172.31.23.25`  | **Không**     | Private IP trong VPC — chỉ node trong cluster dùng nội bộ |
 
-| Name  | Type | Value             |
-| ----- | ---- | ----------------- |
-| @     | A    | `13.238.15.194`   |
-| www   | A    | `13.238.15.194`   |
-| be    | A    | `13.238.15.194`   |
-| admin | A    | `13.238.15.194`   |
+| Name  | Type | Value           |
+| ----- | ---- | --------------- |
+| @     | A    | `13.238.15.194` |
+| www   | A    | `13.238.15.194` |
+| be    | A    | `13.238.15.194` |
+| admin | A    | `13.238.15.194` |
 
 Mở SG **worker-1**: Inbound **TCP 80, 443** từ `0.0.0.0/0`.
 
@@ -269,11 +269,11 @@ kubectl apply -f base/cert-manager/cluster-issuer.yaml
 
 ### Vì sao cấu hình đặc biệt (EC2 kubeadm)?
 
-| Cấu hình | Lý do |
-|----------|--------|
-| `hostNetwork: true` | Bind thẳng port **80/443** trên node — EC2 không có cloud LoadBalancer |
-| `nodeSelector: worker-1` | DNS A record trỏ **public IP worker-1** — traffic phải vào đúng node |
-| Tắt admission webhook | Tránh Helm timeout / job `admission-*` trên cluster nhỏ |
+| Cấu hình                 | Lý do                                                                  |
+| ------------------------ | ---------------------------------------------------------------------- |
+| `hostNetwork: true`      | Bind thẳng port **80/443** trên node — EC2 không có cloud LoadBalancer |
+| `nodeSelector: worker-1` | DNS A record trỏ **public IP worker-1** — traffic phải vào đúng node   |
+| Tắt admission webhook    | Tránh Helm timeout / job `admission-*` trên cluster nhỏ                |
 
 Script `04-install-addons.sh` đã set sẵn các giá trị trên.
 
@@ -324,6 +324,12 @@ kubectl get clusterissuer letsencrypt-prod
 ```
 
 ## Bước 10 — Secret + deploy app (trên cp-1, 30 phút)
+
+Trên cp-1 — làm ngay
+.env.ghcr không lên git — copy bằng scp từ Mac:
+scp -i "/Users/khoi/Desktop/A (source)/fce/findsource/deploy/aws/control-plan-1.pem" \
+ "/Users/khoi/Desktop/A (source)/fce/findsource/deploy/k8s/.env.ghcr" \
+ ubuntu@52.64.229.174:~/deploy/k8s/
 
 Trên cp-1:
 
@@ -398,16 +404,16 @@ CI/CD (`deploy-k8s.yml`) làm **sau** khi site chạy được tay.
 
 Xem **[errors/README.md](./errors/README.md)** — log lỗi thực tế + fix.
 
-| Triệu chứng              | File                                                                                    |
-| ------------------------ | --------------------------------------------------------------------------------------- |
-| `NODE_IP` / init fail    | [01-node-ip-not-set.md](./errors/01-node-ip-not-set.md)                                 |
-| `conntrack not found`    | [02-conntrack-not-found.md](./errors/02-conntrack-not-found.md)                         |
-| join timeout / `nc` 6443 | [03-join-timeout-aws-security-group.md](./errors/03-join-timeout-aws-security-group.md) |
+| Triệu chứng              | File                                                                                        |
+| ------------------------ | ------------------------------------------------------------------------------------------- |
+| `NODE_IP` / init fail    | [01-node-ip-not-set.md](./errors/01-node-ip-not-set.md)                                     |
+| `conntrack not found`    | [02-conntrack-not-found.md](./errors/02-conntrack-not-found.md)                             |
+| join timeout / `nc` 6443 | [03-join-timeout-aws-security-group.md](./errors/03-join-timeout-aws-security-group.md)     |
 | laptop `kubectl` timeout | [04-kubectl-timeout-laptop-private-ip.md](./errors/04-kubectl-timeout-laptop-private-ip.md) |
-| Helm ingress timeout     | [05-helm-ingress-timeout.md](./errors/05-helm-ingress-timeout.md)                         |
-| Node NotReady mãi        | Chưa Flannel (Bước 5)                                                                   |
-| Pod ImagePullBackOff     | Chưa GHCR / ghcr-secret                                                                 |
-| SSL fail                 | DNS, port 80/443                                                                        |
+| Helm ingress timeout     | [05-helm-ingress-timeout.md](./errors/05-helm-ingress-timeout.md)                           |
+| Node NotReady mãi        | Chưa Flannel (Bước 5)                                                                       |
+| Pod ImagePullBackOff     | Chưa GHCR / ghcr-secret                                                                     |
+| SSL fail                 | DNS, port 80/443                                                                            |
 
 ---
 
