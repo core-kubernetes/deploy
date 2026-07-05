@@ -1,0 +1,29 @@
+# Deploy giai đoạn 1: MySQL + API + Ingress (chưa web/admin)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: findsource
+
+resources:
+  - ../../base/namespace.yaml
+  - ../../base/mysql/statefulset.yaml
+  - ../../base/api/deployment.yaml
+  - ../../base/ingress/ingress.yaml
+
+commonLabels:
+  app.kubernetes.io/part-of: findsource
+  app.kubernetes.io/managed-by: kustomize
+
+images:
+  - name: findsource-api
+    newName: ghcr.io/phamtuankhoi/findsource-api
+    newTag: production
+
+patches:
+  - target:
+      kind: Deployment
+      name: api
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 2

@@ -7,16 +7,16 @@ resources:
   - ../../base
   - ../../base/cert-manager/cluster-issuer.yaml
 
-# Sửa org GitHub trước khi deploy
+# GHCR user phải lowercase (phamtuankhoi)
 images:
   - name: findsource-api
-    newName: ghcr.io/YOUR_GITHUB_ORG/findsource-api
+    newName: ghcr.io/phamtuankhoi/findsource-api
     newTag: production
   - name: findsource-web
-    newName: ghcr.io/YOUR_GITHUB_ORG/findsource-web
+    newName: ghcr.io/phamtuankhoi/findsource-web
     newTag: production
   - name: findsource-admin
-    newName: ghcr.io/YOUR_GITHUB_ORG/findsource-admin
+    newName: ghcr.io/phamtuankhoi/findsource-admin
     newTag: production
 
 patches:
