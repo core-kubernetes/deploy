@@ -26,7 +26,8 @@ kubectl describe pod -n ingress-nginx -l app.kubernetes.io/component=controller
 | Pod status | Ý nghĩa |
 |------------|---------|
 | `ImagePullBackOff` | Node không pull được image — kiểm tra internet / SG outbound |
-| `Pending` | Không schedule được — `kubectl describe pod` xem Events |
+| `Pending` (pod mới) + pod cũ `Running` trên cùng worker-1 | **hostNetwork deadlock**: port 80/443 đã bị pod cũ chiếm — rolling update không thể hoàn tất. Pod cũ vẫn phục vụ traffic. Fix: `kubectl rollout undo deployment/ingress-nginx-controller -n ingress-nginx` |
+| `Pending` (không có pod cũ) | Không schedule được — `kubectl describe pod` xem Events |
 | `CrashLoopBackOff` | Port 80/443 bị chiếm trên node — `sudo ss -tlnp \| grep ':80\|:443'` trên worker-1 |
 | Job `admission-*` Error | Dùng script mới (tắt admission webhook) |
 
@@ -40,7 +41,7 @@ helm uninstall ingress-nginx -n ingress-nginx 2>/dev/null || true
 bash scripts/04-install-addons.sh
 ```
 
-Script mới: `hostNetwork`, pin **worker-1**, tắt admission webhook, in debug nếu fail.
+Script mới: `hostNetwork`, pin **worker-1**, `updateStrategy: Recreate` (tránh deadlock rolling update), tắt admission webhook, `kubectl rollout status` thay vì wait mọi pod cùng label.
 
 ## Fix tay (nếu vẫn lỗi)
 

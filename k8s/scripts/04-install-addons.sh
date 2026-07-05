@@ -47,10 +47,12 @@ helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
   --set controller.watchIngressWithoutClass=true \
   --set controller.ingressClassResource.default=true \
   --set controller.admissionWebhooks.enabled=false \
+  --set controller.updateStrategy.type=Recreate \
   --set controller.nodeSelector."kubernetes\.io/hostname"=worker-1 \
   --wait=false
 
-wait_controller ingress-nginx app.kubernetes.io/component=controller 600
+echo "Waiting for ingress-nginx rollout..."
+kubectl rollout status deployment/ingress-nginx-controller -n ingress-nginx --timeout=600s
 
 # cert-manager (tắt startupapicheck — job hook hay timeout trên cluster nhỏ)
 helm upgrade --install cert-manager jetstack/cert-manager \
