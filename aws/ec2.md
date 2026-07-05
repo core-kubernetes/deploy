@@ -48,14 +48,14 @@ Lỗi `context deadline exceeded` khi `kubeadm join` từ worker → **worker kh
 
 Trong **AWS Console → EC2 → Security Groups**, gắn rule cho **SG của cp-1** (và nên giống nhau cho cả 3 instance):
 
-| Type | Port | Source | Mục đích |
-|------|------|--------|----------|
-| Custom TCP | **6443** | **172.31.0.0/16** (VPC CIDR) hoặc SG của worker | API Server |
-| Custom TCP | 10250 | 172.31.0.0/16 | kubelet |
-| Custom TCP | 2379-2380 | 172.31.0.0/16 | etcd (cp-1) |
-| Custom TCP | 10257-10259 | 172.31.0.0/16 | control plane (cp-1) |
-| UDP | **8472** | 172.31.0.0/16 | Flannel VXLAN |
-| Custom TCP | 30000-32767 | 0.0.0.0/0 (tuỳ chọn) | NodePort / Ingress |
+| Type       | Port        | Source                                          | Mục đích             |
+| ---------- | ----------- | ----------------------------------------------- | -------------------- |
+| Custom TCP | **6443**    | **172.31.0.0/16** (VPC CIDR) hoặc SG của worker | API Server           |
+| Custom TCP | 10250       | 172.31.0.0/16                                   | kubelet              |
+| Custom TCP | 2379-2380   | 172.31.0.0/16                                   | etcd (cp-1)          |
+| Custom TCP | 10257-10259 | 172.31.0.0/16                                   | control plane (cp-1) |
+| UDP        | **8472**    | 172.31.0.0/16                                   | Flannel VXLAN        |
+| Custom TCP | 30000-32767 | 0.0.0.0/0 (tuỳ chọn)                            | NodePort / Ingress   |
 
 **Cách nhanh (lab):** Inbound trên SG cp-1 + worker: **All traffic**, Source = **SG id của chính nó** (3 instance cùng 1 SG).
 

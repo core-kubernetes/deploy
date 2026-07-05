@@ -4,14 +4,16 @@ Làm theo checklist này **từ trên xuống**. Mỗi bước có **Checkpoint*
 
 Domain: **emiu.site** · Cluster: **kubeadm** (cp-1 + worker-1 + worker-2)
 
+**Tiến độ deploy (đọc khi quay lại):** [`DEPLOY-STATUS.md`](./DEPLOY-STATUS.md)
+
 ---
 
 ## Bạn cần có trước
 
 - [ ] 3 VPS Ubuntu 22.04 (cp-1: 2C4G · worker-1/2: 4C8G)
-- [ ] SSH key, user `devops` có sudo
+- [ ] SSH key, user **`ubuntu`** có sudo
 - [ ] Domain **emiu.site** (DNS cấu hình ở Bước 8)
-- [ ] Laptop có `git` + `kubectl` (cài sau Bước 4)
+- [ ] Thư mục `~/deploy/k8s` trên cp-1 (git clone hoặc scp)
 
 ---
 
@@ -133,11 +135,11 @@ kubectl get nodes
 
 Cả hai do **`kubeadm init` trên cp-1 tạo ra** — bạn **không tự nghĩ** ra.
 
-| Thành phần | Ví dụ | Ý nghĩa |
-|------------|-------|---------|
-| `172.31.30.134:6443` | IP private cp-1 | Địa chỉ API Server (cùng IP đã dùng trong `03-init-control-plane.sh`) |
-| `--token abc.def` | `91drif.rhe27wpia6l1tvqx` | Mật khẩu tạm để worker đăng ký (bootstrap token) |
-| `--discovery-token-ca-cert-hash sha256:...` | `sha256:350fd38d...` | Hash cert cluster — chống join nhầm cluster giả |
+| Thành phần                                  | Ví dụ                     | Ý nghĩa                                                               |
+| ------------------------------------------- | ------------------------- | --------------------------------------------------------------------- |
+| `172.31.30.134:6443`                        | IP private cp-1           | Địa chỉ API Server (cùng IP đã dùng trong `03-init-control-plane.sh`) |
+| `--token abc.def`                           | `91drif.rhe27wpia6l1tvqx` | Mật khẩu tạm để worker đăng ký (bootstrap token)                      |
+| `--discovery-token-ca-cert-hash sha256:...` | `sha256:350fd38d...`      | Hash cert cluster — chống join nhầm cluster giả                       |
 
 **Nguồn lệnh đầy đủ (chọn 1):**
 
@@ -204,67 +206,132 @@ worker-2   Ready   <none>
 
 ---
 
-## Bước 7 — Kubeconfig về laptop (5 phút)
+## Bước 7 — SSH cp-1 (chuẩn bị deploy)
+
+**Mọi lệnh `kubectl` từ Bước 9 trở đi chạy trên cp-1** — không cần copy kubeconfig về laptop (API dùng IP private `172.31.x.x`, Mac sẽ timeout).
 
 Trên **laptop**:
 
 ```bash
-scp devops@<IP_cp-1>:~/.kube/config ~/.kube/emiu-site.yaml
-export KUBECONFIG=~/.kube/emiu-site.yaml
-kubectl get nodes
+ssh -i control-plan-1.pem ubuntu@52.64.229.174
 ```
 
-**Checkpoint:** Laptop gọi được cluster.
+Trên **cp-1** (kubectl đã setup ở Bước 4):
+
+```bash
+kubectl get nodes -o wide
+```
+
+**Checkpoint:** Thấy cp-1, worker-1, worker-2 đều **Ready**.
+
+**Tuỳ chọn — kubectl trên laptop:** dùng SSH tunnel — [errors/04-kubectl-timeout-laptop-private-ip.md](./errors/04-kubectl-timeout-laptop-private-ip.md).
 
 ---
 
 ## Bước 8 — DNS emiu.site (5 phút)
 
-Tại nhà cung cấp domain, A record → IP **worker-1** (sau Ingress sẽ nhận traffic ở đây):
+Tại nhà cung cấp domain, A record → **public IP worker-1** (Ingress nhận traffic ở đây):
 
-| Name  | Type | Value           |
-| ----- | ---- | --------------- |
-| @     | A    | `<IP_worker-1>` |
-| www   | A    | `<IP_worker-1>` |
-| be    | A    | `<IP_worker-1>` |
-| admin | A    | `<IP_worker-1>` |
+| IP | Dùng cho DNS? | Ghi chú |
+|----|---------------|---------|
+| `13.238.15.194` | **Có** | Public IP — user trên internet truy cập được |
+| `172.31.23.25` | **Không** | Private IP trong VPC — chỉ node trong cluster dùng nội bộ |
+
+| Name  | Type | Value             |
+| ----- | ---- | ----------------- |
+| @     | A    | `13.238.15.194`   |
+| www   | A    | `13.238.15.194`   |
+| be    | A    | `13.238.15.194`   |
+| admin | A    | `13.238.15.194`   |
+
+Mở SG **worker-1**: Inbound **TCP 80, 443** từ `0.0.0.0/0`.
+
+Kiểm tra (laptop hoặc cp-1):
 
 ```bash
 dig +short emiu.site A
 ```
 
-**Checkpoint:** DNS trả đúng IP worker-1 (chờ 5–30 phút nếu mới tạo).
+**Checkpoint:** DNS trả `13.238.15.194` (chờ 5–30 phút nếu mới tạo).
 
 ---
 
-## Bước 9 — Ingress + SSL (cp-1 hoặc laptop, 15 phút)
+## Bước 9 — Ingress + SSL (trên cp-1, 15 phút)
+
+SSH vào cp-1:
 
 ```bash
-export KUBECONFIG=~/.kube/emiu-site.yaml   # laptop hoặc cp-1
-
-# Sửa email trong file trước:
-# deploy/k8s/base/cert-manager/cluster-issuer.yaml
-
-bash deploy/k8s/scripts/04-install-addons.sh
-kubectl apply -f deploy/k8s/base/cert-manager/cluster-issuer.yaml
+cd ~/deploy/k8s
+nano base/cert-manager/cluster-issuer.yaml   # sửa email nếu cần
+bash scripts/04-install-addons.sh
+kubectl apply -f base/cert-manager/cluster-issuer.yaml
 ```
 
-**Checkpoint:**
+### Vì sao cấu hình đặc biệt (EC2 kubeadm)?
+
+| Cấu hình | Lý do |
+|----------|--------|
+| `hostNetwork: true` | Bind thẳng port **80/443** trên node — EC2 không có cloud LoadBalancer |
+| `nodeSelector: worker-1` | DNS A record trỏ **public IP worker-1** — traffic phải vào đúng node |
+| Tắt admission webhook | Tránh Helm timeout / job `admission-*` trên cluster nhỏ |
+
+Script `04-install-addons.sh` đã set sẵn các giá trị trên.
+
+### Checkpoint — Ingress OK
 
 ```bash
-kubectl get pods -n ingress-nginx
+kubectl get pods -n ingress-nginx -o wide
+```
+
+Phải thấy:
+
+```text
+NAME                          READY   STATUS    NODE       IP
+ingress-nginx-controller-...  1/1     Running   worker-1   172.31.23.25
+```
+
+- **NODE = `worker-1`** (không phải worker-2 hay cp-1)
+- **IP = private IP worker-1** (`172.31.23.25`) — **không** phải `10.244.x.x` (nếu thấy `10.244.x.x` = chưa bật hostNetwork)
+
+Kiểm tra port 80/443 **từ cp-1** (không cần SSH worker — file `.pem` chỉ có trên Mac):
+
+```bash
+# Cách 1 — curl public IP worker-1
+curl -I http://13.238.15.194
+
+# Cách 2 — exec vào pod ingress
+kubectl exec -n ingress-nginx deploy/ingress-nginx-controller -- ss -tlnp | grep ':80\|:443'
+```
+
+**Lưu ý:** `sudo ss ...` trên **cp-1** không thấy port 80 — bình thường, vì nginx chạy trên **worker-1**.
+
+Lỗi Helm `context deadline exceeded`: [errors/05-helm-ingress-timeout.md](./errors/05-helm-ingress-timeout.md)
+
+### Checkpoint — cert-manager OK
+
+```bash
 kubectl get pods -n cert-manager
-# Tất cả Running
+kubectl get clusterissuer letsencrypt-prod
 ```
 
----
+Pod `cert-manager`, `cert-manager-webhook`, `cert-manager-cainjector` → **Running**.
 
-## Bước 10 — Secret + deploy app (30 phút)
+Helm báo `failed post-install` / pod `startupapicheck` Error — **bỏ qua** nếu 3 pod trên Running. Chi tiết: [errors/06-cert-manager-startupapicheck.md](./errors/06-cert-manager-startupapicheck.md)
 
 ```bash
-cd deploy/k8s
+kubectl apply -f base/cert-manager/cluster-issuer.yaml
+kubectl get clusterissuer letsencrypt-prod
+```
+
+## Bước 10 — Secret + deploy app (trên cp-1, 30 phút)
+
+Trên cp-1:
+
+```bash
+cd ~/deploy/k8s
 cp .env.production.example .env.production
 # Sửa: password MySQL, JWT secret, v.v.
+nano .env.production
 
 bash scripts/05-create-secrets.sh
 ```
@@ -275,7 +342,7 @@ Sửa image GitHub org trong `overlays/production/kustomization.yaml`:
 newName: ghcr.io/YOUR_GITHUB_USER/findsource-api
 ```
 
-Build image lần đầu (tạm trên laptop hoặc dùng image local — xem Bước 11), rồi:
+Build image lần đầu trên laptop (Bước 11), rồi trên **cp-1**:
 
 ```bash
 kubectl apply -k overlays/production
@@ -306,7 +373,7 @@ docker push ghcr.io/YOUR_USER/findsource-api:production
 # FE / Admin tương tự — nhớ build-arg URL emiu.site
 ```
 
-Tạo pull secret trên cluster:
+Tạo pull secret trên **cp-1**:
 
 ```bash
 kubectl create secret docker-registry ghcr-secret \
@@ -335,23 +402,36 @@ CI/CD (`deploy-k8s.yml`) làm **sau** khi site chạy được tay.
 
 Xem **[errors/README.md](./errors/README.md)** — log lỗi thực tế + fix.
 
-| Triệu chứng          | File |
-| -------------------- | ---- |
-| `NODE_IP` / init fail | [01-node-ip-not-set.md](./errors/01-node-ip-not-set.md) |
-| `conntrack not found` | [02-conntrack-not-found.md](./errors/02-conntrack-not-found.md) |
+| Triệu chứng              | File                                                                                    |
+| ------------------------ | --------------------------------------------------------------------------------------- |
+| `NODE_IP` / init fail    | [01-node-ip-not-set.md](./errors/01-node-ip-not-set.md)                                 |
+| `conntrack not found`    | [02-conntrack-not-found.md](./errors/02-conntrack-not-found.md)                         |
 | join timeout / `nc` 6443 | [03-join-timeout-aws-security-group.md](./errors/03-join-timeout-aws-security-group.md) |
-| Node NotReady mãi    | Chưa Flannel (Bước 5) |
-| Pod ImagePullBackOff | Chưa GHCR / ghcr-secret |
-| SSL fail             | DNS, port 80/443 |
+| laptop `kubectl` timeout | [04-kubectl-timeout-laptop-private-ip.md](./errors/04-kubectl-timeout-laptop-private-ip.md) |
+| Helm ingress timeout     | [05-helm-ingress-timeout.md](./errors/05-helm-ingress-timeout.md)                         |
+| Node NotReady mãi        | Chưa Flannel (Bước 5)                                                                   |
+| Pod ImagePullBackOff     | Chưa GHCR / ghcr-secret                                                                 |
+| SSL fail                 | DNS, port 80/443                                                                        |
 
 ---
 
-## Hôm nay — 3 việc duy nhất
+---
 
-1. **Thuê 3 VPS** + SSH được
-2. **Bước 1 → 3** trên cả 3 máy
-3. **Bước 4 → 6** trên cp-1 rồi join worker
+## Tiếp theo (sau Bước 9 Ingress OK)
 
-Gửi output `kubectl get nodes -o wide` khi xong Bước 6.
+Ingress đã **Running** trên `worker-1` với IP `172.31.23.25` → làm **Bước 10**:
+
+```bash
+# cp-1
+cd ~/deploy/k8s
+kubectl get pods -n cert-manager          # chưa có → chạy phần cert-manager trong script hoặc script lại
+kubectl apply -f base/cert-manager/cluster-issuer.yaml
+
+cp .env.production.example .env.production
+nano .env.production
+bash scripts/05-create-secrets.sh
+# build + push image (Bước 11) rồi:
+kubectl apply -k overlays/production
+```
 
 Học sau: [`../study-kubernetes/README.md`](../study-kubernetes/README.md) · [`K8S-COMPONENTS.md`](./K8S-COMPONENTS.md)

@@ -1,0 +1,20 @@
+---
+description: Đọc tiến độ deploy K8s emiu.site trước khi hướng dẫn deploy
+globs: deploy/**/*
+alwaysApply: false
+---
+
+# Deploy findsource — emiu.site
+
+Khi user hỏi về deploy, kubectl, cp-1, ingress, cert-manager, hoặc "làm tới đâu":
+
+1. **Đọc trước** `deploy/k8s/DEPLOY-STATUS.md` — nguồn tiến độ thực tế.
+2. Hướng dẫn theo **Bước tiếp theo** trong file đó, chi tiết trong `deploy/k8s/GETTING-STARTED.md`.
+3. Sau khi user hoàn thành bước, **đề xuất cập nhật** `DEPLOY-STATUS.md` (checkbox + bước tiếp theo).
+
+## Quy ước cố định
+
+- Mọi `kubectl` / deploy chạy trên **cp-1** (SSH), không laptop.
+- DNS A record → **public IP worker-1** (`13.238.15.194`), không private `172.31.23.25`.
+- Ingress: `hostNetwork` + pod trên **worker-1**.
+- User SSH: `ubuntu@`, key trong `deploy/aws/*.pem` (chỉ trên Mac).
