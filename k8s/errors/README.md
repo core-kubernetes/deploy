@@ -12,6 +12,10 @@ Mỗi file = 1 lỗi: triệu chứng → nguyên nhân → cách sửa → các
 | 4 | Laptop `kubectl` timeout tới `172.31.x.x:6443` | [04-kubectl-timeout-laptop-private-ip.md](./04-kubectl-timeout-laptop-private-ip.md) |
 | 5 | Helm ingress: `context deadline exceeded` | [05-helm-ingress-timeout.md](./05-helm-ingress-timeout.md) |
 | 6 | cert-manager: `failed post-install` / startupapicheck | [06-cert-manager-startupapicheck.md](./06-cert-manager-startupapicheck.md) |
+| 7 | PVC Pending: `no storage class is set` | [07-pvc-no-storageclass.md](./07-pvc-no-storageclass.md) |
+| 8 | Pod chạy lâu ngày bỗng `ImagePullBackOff` — GHCR token bị revoke | [08-ghcr-token-revoked.md](./08-ghcr-token-revoked.md) |
+| 9 | DNS đúng ngoài internet nhưng `SERVFAIL` trong cluster — CoreDNS cache | [09-coredns-negative-cache-acme.md](./09-coredns-negative-cache-acme.md) |
+| 10 | Certificate không issue được dù DNS đã đúng — ACME order/challenge expired | [10-acme-order-expired.md](./10-acme-order-expired.md) |
 
 Quay lại hướng dẫn triển khai: [../GETTING-STARTED.md](../GETTING-STARTED.md)
 

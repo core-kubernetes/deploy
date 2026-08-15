@@ -13,20 +13,9 @@ spec:
     - hosts:
         - emiu.site
         - www.emiu.site
-        - be.emiu.site
         - admin.emiu.site
       secretName: findsource-tls
   rules:
-    - host: be.emiu.site
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: api
-                port:
-                  number: 7003
     - host: emiu.site
       http:
         paths:
