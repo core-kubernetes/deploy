@@ -1,11 +1,13 @@
 1. truy cập -i
 
 cd "/Users/khoi/Desktop/A (source)/fce/findsource/deploy/aws"
-ssh -i control-plan-1.pem ubuntu@52.64.229.174
+ssh -i control-plan-1.pem ubuntu@13.236.58.150
 cd "/Users/khoi/Desktop/A (source)/fce/findsource/deploy/aws"
-ssh -i worker-1.pem ubuntu@13.238.15.194
+ssh -i worker-1.pem ubuntu@54.66.76.232
 cd "/Users/khoi/Desktop/A (source)/fce/findsource/deploy/aws"
-ssh -i worker-2.pem ubuntu@13.54.216.178
+ssh -i worker-2.pem ubuntu@54.66.124.201
+cd "/Users/khoi/Desktop/A (source)/fce/findsource/deploy/aws"
+ssh -i worker-2.pem ubuntu@13.211.26.22
 
 chmod 400 control-plan-1.pem
 
