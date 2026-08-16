@@ -1,15 +1,15 @@
 1. truy cập -i
 
 cd "/Users/khoi/Desktop/A (source)/fce/findsource/deploy/aws"
-ssh -i control-plan-1.pem ubuntu@13.236.58.150
+ssh -i cp.pem ubuntu@13.236.58.150          # control-plane (cp-1)
 cd "/Users/khoi/Desktop/A (source)/fce/findsource/deploy/aws"
-ssh -i worker-1.pem ubuntu@54.66.76.232
+ssh -i worker-1.pem ubuntu@54.66.76.232     # worker-1
 cd "/Users/khoi/Desktop/A (source)/fce/findsource/deploy/aws"
-ssh -i worker-2.pem ubuntu@54.66.124.201
+ssh -i worker-2.pem ubuntu@54.66.124.201    # worker-2
 cd "/Users/khoi/Desktop/A (source)/fce/findsource/deploy/aws"
-ssh -i worker-2.pem ubuntu@13.211.26.22
+ssh -i worker-2.pem ubuntu@13.211.26.22     # worker-3 — dùng CHUNG key pair với worker-2 (AWS key name "worker-2")
 
-chmod 400 control-plan-1.pem
+chmod 400 cp.pem worker-1.pem worker-2.pem
 
 2. Tốt nhất: SSH Config + Terminal
 
@@ -48,7 +48,7 @@ Quản lý 10-20 server vẫn ổn
 
 Lỗi `context deadline exceeded` khi `kubeadm join` từ worker → **worker không tới được cp-1:6443**.
 
-Trong **AWS Console → EC2 → Security Groups**, gắn rule cho **SG của cp-1** (và nên giống nhau cho cả 3 instance):
+Trong **AWS Console → EC2 → Security Groups**, gắn rule cho **SG của cp-1** (và nên giống nhau cho cả 4 instance — cp-1, worker-1, worker-2, worker-3):
 
 | Type       | Port        | Source                                          | Mục đích             |
 | ---------- | ----------- | ----------------------------------------------- | -------------------- |
@@ -59,19 +59,19 @@ Trong **AWS Console → EC2 → Security Groups**, gắn rule cho **SG của cp-
 | UDP        | **8472**    | 172.31.0.0/16                                   | Flannel VXLAN        |
 | Custom TCP | 30000-32767 | 0.0.0.0/0 (tuỳ chọn)                            | NodePort / Ingress   |
 
-**Cách nhanh (lab):** Inbound trên SG cp-1 + worker: **All traffic**, Source = **SG id của chính nó** (3 instance cùng 1 SG).
+**Cách nhanh (lab):** Inbound trên SG cp-1 + worker: **All traffic**, Source = **SG id của chính nó** (4 instance cùng 1 SG).
 
-Kiểm tra từ **worker-1**:
+Kiểm tra từ **mỗi worker** (thay IP private cp-1 hiện tại — xem `kubectl get nodes -o wide` hoặc `hostname -I` trên cp-1):
 
 ```bash
-nc -zv 172.31.30.134 6443
+nc -zv <IP-private-cp-1> 6443
 # Connection succeeded → join lại
 ```
 
-Sau khi sửa SG, trên worker-1:
+Sau khi sửa SG, trên từng worker:
 
 ```bash
-sudo kubeadm join 172.31.30.134:6443 --token ... --discovery-token-ca-cert-hash sha256:...
+sudo kubeadm join <IP-private-cp-1>:6443 --token ... --discovery-token-ca-cert-hash sha256:...
 ```
 
 Chi tiết: [../k8s/errors/03-join-timeout-aws-security-group.md](../k8s/errors/03-join-timeout-aws-security-group.md)

@@ -1,79 +1,63 @@
 # Tiến độ deploy emiu.site
 
-**Cập nhật lần cuối:** 2026-08-01
-**Làm việc trên:** cp-1 (`ssh -i aws/control-plan-1.pem ubuntu@52.64.229.174`)
+**Cập nhật lần cuối:** 2026-08-16
+**Làm việc trên:** cp-1 — IP hiện tại: `cd aws/terraform && terraform output elastic_ips` (KHÔNG dùng IP cũ trong lịch sử chat/tài liệu trước ngày 2026-08-16)
 **Doc chính:** [GETTING-STARTED.md](./GETTING-STARTED.md)
 
-> Khi quay lại sau vài ngày: mở file này trước để biết chính xác trạng thái thật, đừng tin vào ký ức — cluster này bị dùng chung giữa production và lab học, trạng thái đổi liên tục.
+> Khi quay lại sau vài ngày: mở file này trước, đừng tin vào ký ức hay IP đã dùng trước đây — EC2 từng bị relaunch 1 lần khiến toàn bộ IP đổi và cluster cũ mất sạch.
 
 ---
 
-## Trạng thái thật hiện tại (không phải trạng thái lý tưởng)
+## Trạng thái thật hiện tại
 
-**Cluster hạ tầng:** ✅ ổn định — 3 node Ready, kubeadm, Flannel CNI, ingress-nginx, cert-manager đều chạy tốt, không cần đụng lại phần này.
+**Hạ tầng:** 4 EC2 instance (1 control-plane + 3 worker) — **mới hoàn toàn từ 2026-08-16**, cluster/dữ liệu trước đó (kể cả lab học `learn-k8s`, backend `findsource` cũ) **không còn tồn tại**. Instance ID/Elastic IP quản lý qua Terraform tại [`aws/terraform/`](../aws/terraform/).
 
-**Namespace `findsource` (production):** ⚠️ **TRỐNG** — `api` (NestJS) và `mysql` đã bị **xoá hẳn** (kể cả PVC/data) ngày 2026-08-01 để dành cluster học Kubernetes. Có backup SQL tại [`backups/findsource-backup-20260801.sql`](./backups/findsource-backup-20260801.sql). Ingress `findsource` vẫn còn nhưng chỉ còn rule cho `emiu.site` / `www.emiu.site` / `admin.emiu.site` (không có `be.emiu.site`, và `web`/`admin` service cũng chưa từng deploy — 3 domain này sẽ trả 503 nếu gọi).
+**Kubernetes:** ⬜ **chưa deploy gì** — 4 máy đang trống, chưa chạy `kubeadm`. Bắt đầu từ Bước 1 trong [GETTING-STARTED.md](./GETTING-STARTED.md).
 
-**Namespace `learn-k8s` (lab học):** ✅ đang chạy — app `learn-api` (Express.js, không DB), 3 replicas, xem [learn-lab/README.md](./learn-lab/README.md). **Domain `be.emiu.site` hiện đang trỏ vào namespace này**, không phải production.
-
-**Certificate SSL:** `findsource-tls` (namespace `findsource`) Ready, đã copy sang `learn-tls` (namespace `learn-k8s`) để lab dùng chung — cả 2 còn hạn dùng, không cần xin lại khi chuyển domain qua lại.
+**Dữ liệu cũ:** có backup MySQL từ lần deploy trước tại [`backups/findsource-backup-20260801.sql`](./backups/findsource-backup-20260801.sql) — restore lại **sau khi** deploy xong `mysql` mới (xem mục "Khôi phục dữ liệu cũ" cuối GETTING-STARTED.md).
 
 ---
 
-## Muốn làm gì tiếp theo?
+## Việc cần làm — theo đúng thứ tự trong GETTING-STARTED.md
 
-### A. Tiếp tục học Kubernetes
-→ Đọc [learn-lab/README.md](./learn-lab/README.md) và [learn-lab/concepts/](./learn-lab/concepts/). Không cần làm gì thêm ở đây.
-
-### B. Deploy lại production thật (api + mysql)
-→ Làm theo phần **"Khôi phục production sau khi dùng chung cluster với lab học"** ở cuối [GETTING-STARTED.md](./GETTING-STARTED.md) — gồm: lấy lại domain từ lab, deploy lại api/mysql, restore data từ backup.
-
----
-
-## Checklist hạ tầng gốc (không đổi, đã xong từ lâu)
-
-| Bước | Việc | Trạng thái | Ghi chú |
-|------|------|------------|---------|
-| 1–3 | Hostname, repo, kubeadm prereq | ✅ | Ubuntu 26.04 |
-| 4 | Init cp-1 (`172.31.30.134`) | ✅ | |
-| 5 | Flannel CNI | ✅ | |
-| 6 | Join worker-1, worker-2 | ✅ | 3 node Ready |
-| 7 | SSH cp-1, kubectl trên cp-1 | ✅ | Không dùng kubectl laptop |
-| 8 | DNS emiu.site/www/be/admin → **13.238.15.194** | ✅ | Public IP worker-1 |
-| 8b | SG worker-1: TCP 80, 443 | ✅ | AWS Console |
-| 9a | Ingress (hostNetwork + worker-1) | ✅ | |
-| 9b | cert-manager | ✅ | |
-| 9c | ClusterIssuer letsencrypt-prod | ✅ | |
-
-## Checklist tầng ứng dụng (thay đổi tuỳ mục tiêu A/B ở trên)
-
-| Việc | Trạng thái | Ghi chú |
-|------|------------|---------|
-| `api` (NestJS) + `mysql` deploy | ❌ đã xoá | Backup có sẵn, xem mục B ở trên để khôi phục |
-| `web`, `admin` deploy | ⬜ chưa từng làm | Không cấp thiết — chỉ cần `be.emiu.site` theo yêu cầu hiện tại |
-| `learn-api` (lab học) | ✅ chạy | Namespace `learn-k8s`, đang giữ domain `be.emiu.site` |
-| CI/CD GitHub Actions | ⬜ chưa làm | Làm sau khi production ổn định lại |
+| Bước | Việc | Trạng thái |
+|------|------|------------|
+| 1 | Hostname + `/etc/hosts` trên cả 4 máy | ⬜ |
+| 2–3 | Copy repo + cài kubeadm/containerd (cả 4 máy) | ⬜ |
+| 4 | Init control-plane (chỉ cp-1) | ⬜ |
+| 5 | Flannel CNI | ⬜ |
+| 6 | Join worker-1, worker-2, worker-3 | ⬜ |
+| 7 | Xác nhận 4 node Ready | ⬜ |
+| 8 | DNS emiu.site/www/be/admin → public IP worker-1 mới | ⬜ |
+| 9 | Ingress + cert-manager + SSL | ⬜ |
+| 10 | Secret + deploy `api`/`mysql` | ⬜ |
+| 11 | Build/push image GHCR lần đầu | ⬜ |
+| — | Restore data từ backup cũ (tuỳ chọn) | ⬜ |
 
 ---
 
-## Cluster (snapshot)
+## Cluster (điền lại sau khi có IP thật — đừng chép từ tài liệu cũ)
 
 ```
-cp-1       Ready   172.31.30.134   public 52.64.229.174   (control-plane, không chạy app)
-worker-1   Ready   172.31.23.25    public 13.238.15.194   ← DNS + Ingress
-worker-2   Ready   172.31.26.60    public 13.54.216.178
+cp-1       ?   private ?   public ?
+worker-1   ?   private ?   public ?   ← DNS + Ingress
+worker-2   ?   private ?   public ?
+worker-3   ?   private ?   public ?
+```
+
+Lấy nhanh:
+```bash
+cd aws/terraform && terraform output elastic_ips
 ```
 
 ---
 
-## Lệnh kiểm tra nhanh (cp-1)
+## Lệnh kiểm tra nhanh (cp-1, sau khi cluster đã lên)
 
 ```bash
 kubectl get nodes -o wide
-kubectl get pods -A -o wide                         # toàn cảnh mọi namespace
-kubectl get ingress -A                               # xem domain nào trỏ vào đâu
-kubectl get pods,svc,ingress -n findsource
-kubectl get pods,svc,ingress -n learn-k8s
+kubectl get pods -A -o wide
+kubectl get ingress -A
 kubectl get certificate -A
 ```
 
@@ -92,10 +76,10 @@ kubectl get certificate -A
 | DNS đúng ngoài nhưng SERVFAIL trong cluster (CoreDNS cache) | [09-coredns-negative-cache-acme.md](./errors/09-coredns-negative-cache-acme.md) |
 | Certificate không issue dù DNS đã đúng (ACME order expired) | [10-acme-order-expired.md](./errors/10-acme-order-expired.md) |
 
-4 lỗi cuối (07-10) từng xảy ra thật trên chính cluster này ngày 2026-08-01, không phải lý thuyết.
+Tất cả từng xảy ra thật trên hạ tầng trước đây — nhiều khả năng gặp lại, đọc trước khi debug từ đầu.
 
 ---
 
 ## Cách cập nhật file này
 
-Sau khi thay đổi trạng thái thật của cluster (deploy/xoá gì đó), sửa lại phần **"Trạng thái thật hiện tại"** ở đầu file — đừng chỉ tick checklist, vì checklist không phản ánh việc tài nguyên có bị xoá lại sau đó hay không.
+Sau mỗi bước xong, tick `⬜` → `✅` ở bảng trên, và điền lại bảng "Cluster" với IP thật. Nếu hạ tầng bị thay đổi (relaunch, đổi IP) như đã từng xảy ra — cập nhật lại phần "Trạng thái thật hiện tại" ngay, đừng để tài liệu chỉ toàn IP chết.
