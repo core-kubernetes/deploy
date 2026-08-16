@@ -13,6 +13,13 @@ spec:
       labels:
         app: learn-api
     spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: learn-api
       imagePullSecrets:
         - name: ghcr-secret
       containers:

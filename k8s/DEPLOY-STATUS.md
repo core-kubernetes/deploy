@@ -12,27 +12,29 @@
 
 **Hạ tầng:** 4 EC2 instance (1 control-plane + 3 worker) — **mới hoàn toàn từ 2026-08-16**, cluster/dữ liệu trước đó (kể cả lab học `learn-k8s`, backend `findsource` cũ) **không còn tồn tại**. Instance ID/Elastic IP quản lý qua Terraform tại [`aws/terraform/`](../aws/terraform/).
 
-**Kubernetes:** ⬜ **chưa deploy gì** — 4 máy đang trống, chưa chạy `kubeadm`. Bắt đầu từ Bước 1 trong [GETTING-STARTED.md](./GETTING-STARTED.md).
+**Kubernetes:** ✅ Cluster đã lên — 4 node Ready, ingress-nginx + cert-manager + ClusterIssuer đã cài xong (Bước 1-9 trong [GETTING-STARTED.md](./GETTING-STARTED.md) hoàn tất).
 
-**Dữ liệu cũ:** có backup MySQL từ lần deploy trước tại [`backups/findsource-backup-20260801.sql`](./backups/findsource-backup-20260801.sql) — restore lại **sau khi** deploy xong `mysql` mới (xem mục "Khôi phục dữ liệu cũ" cuối GETTING-STARTED.md).
+**⚠️ Quyết định thay đổi scope (2026-08-16):** **KHÔNG deploy backend NestJS (`api`) + MySQL nữa** (bỏ hẳn Bước 10/11 của GETTING-STARTED.md, không phải tạm hoãn). Domain `be.emiu.site` dùng cho **`learn-api`** (Express, lab học Kubernetes) — xem [learn-lab/README.md](./learn-lab/README.md). Không còn xung đột domain vì backend thật không deploy.
+
+**Dữ liệu cũ:** backup MySQL cũ tại [`backups/findsource-backup-20260801.sql`](./backups/findsource-backup-20260801.sql) — không cần dùng tới trừ khi sau này đổi ý deploy lại backend thật.
 
 ---
 
-## Việc cần làm — theo đúng thứ tự trong GETTING-STARTED.md
+## Việc cần làm
 
 | Bước | Việc | Trạng thái |
 |------|------|------------|
-| 1 | Hostname + `/etc/hosts` trên cả 4 máy | ⬜ |
-| 2–3 | Copy repo + cài kubeadm/containerd (cả 4 máy) | ⬜ |
-| 4 | Init control-plane (chỉ cp-1) | ⬜ |
-| 5 | Flannel CNI | ⬜ |
-| 6 | Join worker-1, worker-2, worker-3 | ⬜ |
-| 7 | Xác nhận 4 node Ready | ⬜ |
-| 8 | DNS emiu.site/www/be/admin → public IP worker-1 mới | ⬜ |
-| 9 | Ingress + cert-manager + SSL | ⬜ |
-| 10 | Secret + deploy `api`/`mysql` | ⬜ |
-| 11 | Build/push image GHCR lần đầu | ⬜ |
-| — | Restore data từ backup cũ (tuỳ chọn) | ⬜ |
+| 1 | Hostname + `/etc/hosts` trên cả 4 máy | ✅ |
+| 2–3 | Copy repo + cài kubeadm/containerd (cả 4 máy) | ✅ |
+| 4 | Init control-plane (chỉ cp-1) | ✅ |
+| 5 | Flannel CNI | ✅ |
+| 6 | Join worker-1, worker-2, worker-3 | ✅ |
+| 7 | Xác nhận 4 node Ready | ✅ |
+| 8 | DNS emiu.site/www/be/admin → public IP worker-1 mới | ✅ |
+| 9 | Ingress + cert-manager + SSL | ✅ |
+| ~~10~~ | ~~Secret + deploy `api`/`mysql`~~ | ❌ bỏ, không deploy backend thật nữa |
+| ~~11~~ | ~~Build/push image GHCR lần đầu~~ | ❌ bỏ (chỉ áp dụng cho backend thật) |
+| — | Deploy `learn-api` lên `be.emiu.site` (namespace `learn-k8s`, 3 pod trải đều 3 worker) | ⬜ đang làm — xem [learn-lab/README.md](./learn-lab/README.md) |
 
 ---
 

@@ -137,6 +137,23 @@ kubectl get nodes
 
 ## Bước 6 — Join worker (worker-1, worker-2 & worker-3, 10 phút)
 
+⚠️ **Mở Security Group TRƯỚC khi join**, không đợi lỗi mới sửa — worker cần thấy được `cp-1:6443` (và vài port nội bộ khác) mới join được. Chạy từ laptop (không cần SSH vào server nào):
+
+```bash
+bash aws/scripts/open-k8s-security-groups.sh
+```
+
+Script tự tra Security Group của cả 4 instance theo tag Name và mở đủ port cần thiết (6443, 10250, 2379-2380, 10257-10259, 8472/udp), chạy lại vô hại nếu rule đã có sẵn. Nếu không dùng script được (không có quyền AWS CLI), làm tay theo [aws/ec2.md](../aws/ec2.md) mục 3.
+
+Kiểm tra đã thông chưa (SSH vào 1 worker bất kỳ):
+
+```bash
+nc -zv <IP-private-cp-1> 6443
+# Connection succeeded → mới tiếp tục các bước join bên dưới
+```
+
+Lỗi `context deadline exceeded` khi join dù đã mở SG → xem chi tiết [errors/03-join-timeout-aws-security-group.md](./errors/03-join-timeout-aws-security-group.md).
+
 ### Token và `sha256:...` lấy ở đâu?
 
 Cả hai do **`kubeadm init` trên cp-1 tạo ra** — bạn **không tự nghĩ** ra.
@@ -341,15 +358,17 @@ kubectl get clusterissuer letsencrypt-prod
 
 ### Checkpoint — Certificate thật sự Ready (không phải fake cert)
 
+⚠️ Certificate **chỉ xuất hiện sau khi** 1 app có Ingress + annotation `cert-manager.io/cluster-issuer` được deploy (Bước 10) — chưa deploy app nào thì chưa có gì để kiểm tra ở đây, quay lại phần này **sau** khi làm Bước 10.
+
 ```bash
-kubectl get certificate -n findsource
-# findsource-tls   READY=True   ← phải là True, không phải False
+kubectl get certificate -n <namespace-app>
+# <ten-cert>   READY=True   ← phải là True, không phải False
 ```
 
 Nếu **`READY: False` quá vài phút**, kiểm tra từng domain:
 
 ```bash
-kubectl get challenge -n findsource
+kubectl get challenge -n <namespace-app>
 ```
 
 - Domain nào `state: pending` mãi → DNS domain đó **chưa resolve được từ BÊN TRONG cluster** (khác với resolve được từ laptop!). Test đúng cách:
@@ -359,84 +378,27 @@ kubectl get challenge -n findsource
   Nếu `SERVFAIL` dù DNS ngoài đã đúng (`dig` từ laptop ra kết quả tốt) → **CoreDNS đang cache kết quả lỗi cũ** (thường xảy ra khi record DNS được thêm **trễ**, sau khi cert-manager đã thử và fail vài lần). Fix: `kubectl rollout restart deployment coredns -n kube-system`, đợi ~10s, test lại `nslookup`.
 - Nếu challenge ở trạng thái **`expired`** (thường sau khi bị pending quá lâu, > vài chục phút tới vài giờ tuỳ ACME server) → order cũ **không tự retry được nữa**, phải tạo lại từ đầu:
   ```bash
-  kubectl delete certificate findsource-tls -n findsource
-  kubectl apply -f base/cert-manager/cluster-issuer.yaml   # (không bắt buộc, issuer không đổi)
-  kubectl apply -k overlays/production   # ingress-shim sẽ tự tạo lại Certificate mới từ Ingress
+  kubectl delete certificate <ten-cert> -n <namespace-app>
+  kubectl apply -f <ingress-yaml-của-app>   # ingress-shim sẽ tự tạo lại Certificate mới từ Ingress
   ```
   Chi tiết đầy đủ: [errors/09-coredns-negative-cache-acme.md](./errors/09-coredns-negative-cache-acme.md) và [errors/10-acme-order-expired.md](./errors/10-acme-order-expired.md)
 
-## Bước 10 — Secret + deploy app (trên cp-1, 30 phút)
+## Bước 10 — Deploy app
 
-Trên cp-1 — làm ngay
-.env.ghcr không lên git — copy bằng scp từ Mac (IP lấy từ `terraform output elastic_ips`):
-scp -i aws/cp.pem k8s/.env.ghcr ubuntu@<IP-public-cp-1>:~/deploy/k8s/
+Cluster + hạ tầng (Ingress, cert-manager, SSL) đã sẵn sàng sau Bước 9 — đây là phần **dùng chung cho mọi app**, không riêng gì backend findsource.
 
-Trên cp-1:
+**App đang deploy: `learn-api`** (lab học Kubernetes, namespace `learn-k8s`, domain `be.emiu.site`) → làm theo [learn-lab/README.md](./learn-lab/README.md), không theo hướng dẫn findsource nữa.
 
-```bash
-cd ~/deploy/k8s
-cp .env.production.example .env.production
-# Sửa: password MySQL, JWT secret, v.v.
-nano .env.production
-
-bash scripts/05-create-secrets.sh
-```
-
-Image GHCR: `ghcr.io/phamtuankhoi/...` (đã set trong `overlays/`). Credential: [GHCR.md](./GHCR.md) + file `.env.ghcr`.
-
-Build image lần đầu trên laptop (Bước 11), rồi trên **cp-1**:
-
-```bash
-kubectl apply -k overlays/production
-kubectl get pods -n findsource -w
-```
-
-**Checkpoint:** Pod `api`, `web`, `admin`, `mysql` → **Running**.
-
-```bash
-curl -I http://be.emiu.site/process    # trước SSL
-curl -I https://be.emiu.site/process   # sau cert Ready (~2 phút)
-```
-
----
-
-## Bước 11 — Image lần đầu (chưa cần CI)
-
-Chi tiết + credential: **[GHCR.md](./GHCR.md)** (file `.env.ghcr`, user `PhamTuanKhoi`, image `ghcr.io/phamtuankhoi`).
-
-**Mac:**
-
-```bash
-cd deploy/k8s && set -a && source .env.ghcr && set +a
-echo "$GITHUB_PAT" | docker login ghcr.io -u "$GITHUB_USER" --password-stdin
-export GHCR_USER=phamtuankhoi
-
-cd findsource-be
-docker build -t ghcr.io/$GHCR_USER/findsource-api:production .
-docker push ghcr.io/$GHCR_USER/findsource-api:production
-```
-
-**cp-1** (copy `.env.ghcr` lên server hoặc tạo tay):
-
-```bash
-cd ~/deploy/k8s
-bash scripts/05b-create-ghcr-secret.sh
-bash scripts/08-deploy-be.sh          # mysql + api trước
-# kubectl apply -k overlays/production   # sau khi push đủ web/admin
-```
-
-CI/CD (`deploy-k8s.yml`) làm **sau** khi site chạy được tay.
-
-⚠️ **GHCR token (`GITHUB_PAT`) có thể bị GitHub thu hồi TRƯỚC ngày hết hạn** (secret scanning tự phát hiện token lộ, hoặc bị revoke thủ công) — pod chạy ổn định nhiều ngày/tuần **không có nghĩa token còn dùng được**, vì image đã cache sẵn trên node không cần pull lại. Token chỉ thật sự bị kiểm tra lại khi node reboot / pod bị xoá và phải pull image lần nữa.
-
-**Triệu chứng:** pod đã Running lâu ngày bỗng `ImagePullBackOff` sau khi node restart hoặc pod bị xoá, log có `403 Forbidden` khi pull GHCR. Cách kiểm tra token còn dùng được không:
+⚠️ **GHCR token (`GITHUB_PAT`) có thể bị GitHub thu hồi TRƯỚC ngày hết hạn** (secret scanning tự phát hiện token lộ, hoặc bị revoke thủ công) — pod chạy ổn định nhiều ngày/tuần **không có nghĩa token còn dùng được**, vì image đã cache sẵn trên node không cần pull lại. Kiểm tra nhanh:
 
 ```bash
 curl -s -o /dev/null -w "%{http_code}\n" -u "$GITHUB_USER:$GITHUB_PAT" https://api.github.com/user
 # 200 = token OK · 401 = token bị revoke, cần tạo token mới
 ```
 
-Fix: tạo PAT mới (scope `read:packages`) tại github.com/settings/tokens → sửa `.env.ghcr` → chạy lại `scripts/05b-create-ghcr-secret.sh` → `kubectl delete pod -n findsource -l app=api` để pod pull lại bằng token mới. Chi tiết: [errors/08-ghcr-token-revoked.md](./errors/08-ghcr-token-revoked.md)
+Chi tiết: [errors/08-ghcr-token-revoked.md](./errors/08-ghcr-token-revoked.md)
+
+*(Deploy backend NestJS `findsource-be` + MySQL thật — nếu sau này cần lại — dùng file `overlays/production-be/` (chỉ mysql+api) hoặc `overlays/production/` (đủ api+web+admin, cần build/push đủ 3 image trước). Không nằm trong checklist chính nữa, xem `GHCR.md` + `scripts/08-deploy-be.sh` nếu cần tham khảo.)*
 
 ---
 
@@ -471,41 +433,6 @@ Xem **[errors/README.md](./errors/README.md)** — log lỗi thực tế + fix.
 
 ---
 
----
-
-## Tiếp theo (sau Bước 9 Ingress OK)
-
-Ingress đã **Running** trên `worker-1` (private IP `172.31.x.x`, xem checkpoint Bước 9) → làm **Bước 10**:
-
-```bash
-# cp-1
-cd ~/deploy/k8s
-kubectl get pods -n cert-manager          # chưa có → chạy phần cert-manager trong script hoặc script lại
-kubectl apply -f base/cert-manager/cluster-issuer.yaml
-
-cp .env.production.example .env.production
-nano .env.production
-bash scripts/05-create-secrets.sh
-# build + push image (Bước 11) rồi:
-kubectl apply -k overlays/production
-```
-
 Học sau: [`../study-kubernetes/README.md`](../study-kubernetes/README.md) · [`K8S-COMPONENTS.md`](./K8S-COMPONENTS.md)
 
----
-
-## Khôi phục dữ liệu cũ (nếu cần) sau khi deploy lại từ đầu
-
-Cluster hiện tại (2026-08-16) là **4 server hoàn toàn mới**, không còn state cũ (namespace `findsource`, `learn-k8s` cũ đều không tồn tại — xem cảnh báo đầu file). Sau khi làm xong Bước 1-11 và có `api` + `mysql` chạy lại (`kubectl get pods -n findsource` thấy `mysql-0` Running), nếu muốn lấy lại dữ liệu database cũ từ trước khi hạ tầng bị thay mới:
-
-```bash
-# Backup cũ nằm ở k8s/backups/findsource-backup-20260801.sql trên laptop
-# Lấy IP public cp-1 hiện tại trước: cd aws/terraform && terraform output elastic_ips
-scp -i aws/cp.pem k8s/backups/findsource-backup-*.sql ubuntu@<IP-public-cp-1>:~/
-
-# Trên cp-1 — đợi mysql-0 Running rồi mới import
-PW=$(kubectl get secret findsource-mysql-env -n findsource -o jsonpath='{.data.MYSQL_ROOT_PASSWORD}' | base64 -d)
-kubectl exec -i -n findsource mysql-0 -- env MYSQL_PWD="$PW" mysql -uroot findsource < ~/findsource-backup-*.sql
-```
-
-**Checkpoint:** `curl https://be.emiu.site/process` trả response thật từ NestJS API.
+*(Backup MySQL cũ của backend findsource — nếu sau này cần deploy lại backend thật và muốn lấy lại data — nằm ở [`backups/findsource-backup-20260801.sql`](./backups/findsource-backup-20260801.sql). Không cần tới khi chỉ dùng `learn-api`.)*
