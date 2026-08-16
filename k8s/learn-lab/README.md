@@ -57,9 +57,16 @@ docker push ghcr.io/phamtuankhoi/learn-api:latest
 ```
 Bỏ qua bước này nếu image cũ trên GHCR còn dùng được — image KHÔNG bị xoá khi cluster bị relaunch, chỉ có k8s/cluster mất, container registry (GHCR) vẫn còn.
 
-**2. Copy MANIFEST + credential lên cp-1** (chỉ 4 file YAML + `.env.ghcr` — cp-1 chỉ cần cái này để chạy `kubectl`, không cần code app):
+**2. Đảm bảo cp-1 có đủ manifest + credential** — **luôn dùng đúng path gốc `learn-lab/k8s/`, không đổi tên thư mục** (tránh lệch path giữa các cách lấy code khác nhau):
+
+- Nếu cp-1 đã `git clone` cả repo (theo Bước 2 trong [../GETTING-STARTED.md](../GETTING-STARTED.md)) → file đã có sẵn ở đúng `~/deploy/k8s/learn-lab/k8s/`, chỉ cần `git pull` nếu code trên laptop mới sửa. Kiểm tra: `ls ~/deploy/k8s/learn-lab/k8s/`.
+- Nếu cp-1 chưa có repo, copy riêng bằng scp (chạy trên laptop, **giữ nguyên cấu trúc thư mục**, không đổi tên đích):
+  ```bash
+  scp -i aws/cp.pem -r k8s/learn-lab ubuntu@<IP-public-cp-1>:~/deploy/k8s/
+  ```
+
+Riêng `.env.ghcr` — **luôn phải scp riêng dù dùng cách nào**, vì bị `.gitignore` không nằm trong git clone:
 ```bash
-scp -i aws/cp.pem -r k8s/learn-lab/k8s ubuntu@<IP-public-cp-1>:~/deploy/k8s/learn-lab-k8s
 scp -i aws/cp.pem k8s/.env.ghcr ubuntu@<IP-public-cp-1>:~/deploy/k8s/
 ```
 IP lấy từ `cd aws/terraform && terraform output elastic_ips`.
@@ -67,9 +74,9 @@ IP lấy từ `cd aws/terraform && terraform output elastic_ips`.
 **3. Trên cp-1 — tạo namespace, tạo secret pull image, deploy:**
 ```bash
 cd ~/deploy/k8s
-kubectl apply -f learn-lab-k8s/namespace.yaml
+kubectl apply -f learn-lab/k8s/namespace.yaml
 NAMESPACE=learn-k8s bash scripts/05b-create-ghcr-secret.sh
-kubectl apply -f learn-lab-k8s/deployment.yaml -f learn-lab-k8s/service.yaml -f learn-lab-k8s/ingress.yaml
+kubectl apply -f learn-lab/k8s/deployment.yaml -f learn-lab/k8s/service.yaml -f learn-lab/k8s/ingress.yaml
 ```
 
 **4. Kiểm tra pod trải đều 3 worker:**
